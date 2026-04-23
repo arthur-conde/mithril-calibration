@@ -1,6 +1,6 @@
 # gorgon-calibration
 
-Community-sourced calibration data for [Project Gorgon companion app](https://github.com/arthur-conde/project-gorgon)'s **Samwise** (garden growth rates) and **Arwen** (NPC favor/gift rates) modules. New installs of the app fetch the aggregated rates here so they get useful forecasts on day one instead of grinding from zero.
+Community-sourced calibration data for [Project Gorgon companion app](https://github.com/arthur-conde/project-gorgon)'s **Samwise** (garden growth rates), **Arwen** (NPC favor/gift rates), and **Smaug** (NPC vendor prices) modules. New installs of the app fetch the aggregated rates here so they get useful forecasts on day one instead of grinding from zero.
 
 ## What's in this repo
 
@@ -8,13 +8,15 @@ Community-sourced calibration data for [Project Gorgon companion app](https://gi
 |---|---|
 | `aggregated/samwise.json` | Current merged Samwise rates, consumed by the app |
 | `aggregated/arwen.json` | Current merged Arwen rates, consumed by the app |
+| `aggregated/smaug.json` | Current merged Smaug vendor prices, consumed by the app |
 | `contributions/samwise/` | Raw per-contributor Samwise submissions (one `.json` per contribution) |
 | `contributions/arwen/` | Raw per-contributor Arwen submissions |
+| `contributions/smaug/` | Raw per-contributor Smaug submissions |
 | `scripts/aggregate.py` | Merges `contributions/*` into `aggregated/*` |
 | `.github/ISSUE_TEMPLATE/` | Submission templates wired into the app's `Share` button |
 | `.github/workflows/aggregate.yml` | CI runs the aggregator on new issues and PRs |
 
-The app fetches from `https://raw.githubusercontent.com/arthur-conde/gorgon-calibration/main/aggregated/{samwise|arwen}.json`.
+The app fetches from `https://raw.githubusercontent.com/arthur-conde/gorgon-calibration/main/aggregated/{samwise|arwen|smaug}.json`.
 
 ## Contributing
 
@@ -56,11 +58,26 @@ The aggregator picks up new issues, merges your numbers with everyone else's usi
 }
 ```
 
+**Smaug** (`schemaVersion: 1`):
+
+Keys are 4 segments split on `|`: `NpcKey|ItemInternalName|FavorTier|CivicPrideBucket` for `absoluteRates` (fixed-Value items like seeds, water), or `NpcKey|KeywordBucket|FavorTier|CivicPrideBucket` for `ratioRates` (variable-Value items like augments and gear, where the ratio is `pricePaid / itemBaseValue`). `CivicPrideBucket` values include `0-4`, `5-14`, `15-24`, `25-34`, `35-44`, `45+` — the literal `+` is part of the key.
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "module": "smaug",
+  "exportedAt": "2026-04-22T...",
+  "contributorNote": "optional",
+  "absoluteRates": { "NPC_Yetta|BottleOfWater|Neutral|45+":  { "avgPrice": 11.0, "sampleCount": 4,  "minPrice": 11,   "maxPrice": 11   } },
+  "ratioRates":    { "NPC_Yetta|Augment|Friends|5-14":       { "avgRatio": 0.85, "sampleCount": 12, "minRatio": 0.40, "maxRatio": 1.00 } }
+}
+```
+
 ## Aggregation math
 
-- `avg` / `rate`: sample-count-weighted mean across contributors.
+- `avg` / `rate` / `avgPrice` / `avgRatio`: sample-count-weighted mean across contributors.
 - `sampleCount`: sum across contributors.
-- `min` / `max`: global min / max across contributors.
+- `min` / `max` (including `minPrice`/`maxPrice` and `minRatio`/`maxRatio`): global min / max across contributors.
 - `SlotCapRate.observedMax`: global **max** (caps are ceilings, not averages).
 
 Aggregation runs per-key within each dictionary. Dictionaries never merge across types.

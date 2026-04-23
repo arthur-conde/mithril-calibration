@@ -1,0 +1,43 @@
+name: Smaug calibration contribution
+description: Share your NPC vendor price observations with the community.
+title: "[smaug-contribution] "
+labels: ["contribution", "smaug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing! This form is wired to the app's `Share with community` button.
+
+        The button always copies a sanitized JSON payload to your clipboard (per-NPC vendor prices, sample counts, min/max — **no** raw observations, **no** character names). Smaug payloads can be large; if the field below arrives empty, paste from your clipboard.
+
+        Payload shape is documented in the [README](https://github.com/arthur-conde/gorgon-calibration#payload-shape).
+  - type: textarea
+    id: payload
+    attributes:
+      label: Calibration payload (JSON)
+      description: Paste the JSON payload from the app's Share dialog. Must be a fenced ```json block.
+      render: json
+      placeholder: |
+        {
+          "schemaVersion": 1,
+          "module": "smaug",
+          "exportedAt": "2026-04-23T12:00:00Z",
+          "absoluteRates": { "NPC_Yetta|BottleOfWater|Neutral|45+": { "avgPrice": 11.0, "sampleCount": 4,  "minPrice": 11,   "maxPrice": 11   } },
+          "ratioRates":    { "NPC_Yetta|Augment|Friends|5-14":      { "avgRatio": 0.85, "sampleCount": 12, "minRatio": 0.40, "maxRatio": 1.00 } }
+        }
+    validations:
+      required: true
+  - type: textarea
+    id: contributorNote
+    attributes:
+      label: Note (optional)
+      description: Anything you want future readers of `contributions/smaug/<n>.json` to know.
+    validations:
+      required: false
+  - type: checkboxes
+    id: attributionOptOut
+    attributes:
+      label: Attribution
+      options:
+        - label: Don't list me in the README contributors block
+          required: false

@@ -66,6 +66,18 @@ def _arwen_payload(item=None, sig=None, npc=None, kw=None, *, submitter="alice",
     }
 
 
+def _smaug_payload(absolute=None, ratio=None, *, submitter="alice", opt_out=False):
+    return {
+        "schemaVersion": 1,
+        "module": "smaug",
+        "exportedAt": "2026-04-22T00:00:00Z",
+        "submitter": submitter,
+        "attributionOptOut": opt_out,
+        "absoluteRates": absolute or {},
+        "ratioRates": ratio or {},
+    }
+
+
 class AggregateTestBase(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -74,6 +86,7 @@ class AggregateTestBase(unittest.TestCase):
         self.aggregated = self.root / "aggregated"
         (self.contrib / "samwise").mkdir(parents=True)
         (self.contrib / "arwen").mkdir(parents=True)
+        (self.contrib / "smaug").mkdir(parents=True)
         self.aggregated.mkdir(parents=True)
         self.readme = self.root / "README.md"
         self.readme.write_text(README_TEMPLATE, encoding="utf-8")
@@ -137,6 +150,91 @@ class TestMergeMath(AggregateTestBase):
         agg = self.read_aggregated("samwise")
         self.assertEqual(agg["slotCapRates"]["Lily"]["observedMax"], 10)
         self.assertEqual(agg["slotCapRates"]["Lily"]["sampleCount"], 8)
+
+
+class TestSmaugMergeMath(AggregateTestBase):
+    ABS_KEY = "NPC_Yetta|BottleOfWater|Neutral|45+"
+    RATIO_KEY = "NPC_Yetta|Augment|Friends|5-14"
+
+    def test_smaug_absolute_rates_weighted_mean(self):
+        _write(self.contrib / "smaug" / "1.json", _smaug_payload(
+            absolute={self.ABS_KEY: {"avgPrice": 10, "sampleCount": 4, "minPrice": 8, "maxPrice": 12}},
+        ))
+        _write(self.contrib / "smaug" / "2.json", _smaug_payload(
+            absolute={self.ABS_KEY: {"avgPrice": 14, "sampleCount": 6, "minPrice": 11, "maxPrice": 18}},
+        ))
+        self.run_aggregate()
+        agg = self.read_aggregated("smaug")
+        entry = agg["absoluteRates"][self.ABS_KEY]
+        expected = (10 * 4 + 14 * 6) / 10
+        self.assertAlmostEqual(entry["avgPrice"], expected)
+        self.assertEqual(entry["sampleCount"], 10)
+        self.assertEqual(entry["minPrice"], 8)
+        self.assertEqual(entry["maxPrice"], 18)
+
+    def test_smaug_ratio_rates_weighted_mean(self):
+        _write(self.contrib / "smaug" / "1.json", _smaug_payload(
+            ratio={self.RATIO_KEY: {"avgRatio": 0.40, "sampleCount": 12, "minRatio": 0.20, "maxRatio": 0.60}},
+        ))
+        _write(self.contrib / "smaug" / "2.json", _smaug_payload(
+            ratio={self.RATIO_KEY: {"avgRatio": 0.85, "sampleCount": 8, "minRatio": 0.70, "maxRatio": 1.00}},
+        ))
+        self.run_aggregate()
+        agg = self.read_aggregated("smaug")
+        entry = agg["ratioRates"][self.RATIO_KEY]
+        expected = (0.40 * 12 + 0.85 * 8) / 20
+        self.assertAlmostEqual(entry["avgRatio"], expected)
+        self.assertEqual(entry["sampleCount"], 20)
+        self.assertAlmostEqual(entry["minRatio"], 0.20)
+        self.assertAlmostEqual(entry["maxRatio"], 1.00)
+
+    def test_smaug_disjoint_keys_copied_through(self):
+        unique_a = "NPC_Yetta|Carrot|Neutral|0-4"
+        unique_b = "NPC_Yetta|Onion|Neutral|45+"
+        _write(self.contrib / "smaug" / "1.json", _smaug_payload(
+            absolute={unique_a: {"avgPrice": 5, "sampleCount": 2, "minPrice": 5, "maxPrice": 5}},
+        ))
+        _write(self.contrib / "smaug" / "2.json", _smaug_payload(
+            absolute={unique_b: {"avgPrice": 7, "sampleCount": 3, "minPrice": 7, "maxPrice": 7}},
+        ))
+        self.run_aggregate()
+        agg = self.read_aggregated("smaug")
+        self.assertEqual(agg["absoluteRates"][unique_a]["sampleCount"], 2)
+        self.assertEqual(agg["absoluteRates"][unique_b]["sampleCount"], 3)
+        self.assertAlmostEqual(agg["absoluteRates"][unique_a]["avgPrice"], 5)
+        self.assertAlmostEqual(agg["absoluteRates"][unique_b]["avgPrice"], 7)
+
+    def test_smaug_dicts_dont_cross(self):
+        shared = "NPC_Yetta|GloveAugment|Friends|45+"
+        _write(self.contrib / "smaug" / "1.json", _smaug_payload(
+            absolute={shared: {"avgPrice": 100, "sampleCount": 2, "minPrice": 100, "maxPrice": 100}},
+        ))
+        _write(self.contrib / "smaug" / "2.json", _smaug_payload(
+            ratio={shared: {"avgRatio": 0.5, "sampleCount": 3, "minRatio": 0.5, "maxRatio": 0.5}},
+        ))
+        self.run_aggregate()
+        agg = self.read_aggregated("smaug")
+        self.assertIn(shared, agg["absoluteRates"])
+        self.assertIn(shared, agg["ratioRates"])
+        self.assertEqual(agg["absoluteRates"][shared]["sampleCount"], 2)
+        self.assertEqual(agg["ratioRates"][shared]["sampleCount"], 3)
+        self.assertAlmostEqual(agg["absoluteRates"][shared]["avgPrice"], 100)
+        self.assertAlmostEqual(agg["ratioRates"][shared]["avgRatio"], 0.5)
+
+
+class TestSmaugValidation(AggregateTestBase):
+    def test_wrong_schema_version_rejected(self):
+        bad = _smaug_payload(
+            absolute={"NPC_X|Y|Neutral|0-4": {"avgPrice": 1, "sampleCount": 1, "minPrice": 1, "maxPrice": 1}},
+        )
+        bad["schemaVersion"] = 2
+        _write(self.contrib / "smaug" / "1.json", bad)
+        with self.assertLogs(aggregate.log, level="WARNING") as cm:
+            self.run_aggregate()
+        self.assertTrue(any("1.json" in m and "schemaVersion" in m for m in cm.output))
+        agg = self.read_aggregated("smaug")
+        self.assertEqual(agg["absoluteRates"], {})
+        self.assertEqual(agg["ratioRates"], {})
 
 
 class TestValidation(AggregateTestBase):
@@ -250,7 +348,7 @@ class TestIdempotence(AggregateTestBase):
 
 
 class TestIngestIssue(AggregateTestBase):
-    def _make_event(self, *, number, login, body, labels, is_pr=False):
+    def _make_event(self, *, number, login, body, labels, is_pr=False, title="[samwise-contribution] test"):
         key = "pull_request" if is_pr else "issue"
         return {
             key: {
@@ -258,7 +356,7 @@ class TestIngestIssue(AggregateTestBase):
                 "user": {"login": login},
                 "body": body,
                 "labels": [{"name": l} for l in labels],
-                "title": "[samwise-contribution] test",
+                "title": title,
             }
         }
 
@@ -293,6 +391,27 @@ class TestIngestIssue(AggregateTestBase):
         aggregate.ingest_issue(event_path, contrib_root=self.contrib)
         stored = json.loads((self.contrib / "samwise" / "7.json").read_text(encoding="utf-8"))
         self.assertTrue(stored["attributionOptOut"])
+
+    def test_ingest_smaug_issue_by_label(self):
+        payload = _smaug_payload(
+            absolute={"NPC_Yetta|BottleOfWater|Neutral|45+": {
+                "avgPrice": 11, "sampleCount": 4, "minPrice": 11, "maxPrice": 11,
+            }},
+            submitter="evil_impersonator",
+        )
+        body = "```json\n" + json.dumps(payload) + "\n```"
+        event = self._make_event(
+            number=99, login="real_user", body=body,
+            labels=["contribution", "smaug"],
+            title="[smaug-contribution] vendor prices from Yetta",
+        )
+        event_path = self.root / "event.json"
+        event_path.write_text(json.dumps(event), encoding="utf-8")
+
+        dest = aggregate.ingest_issue(event_path, contrib_root=self.contrib)
+        self.assertEqual(dest, self.contrib / "smaug" / "99.json")
+        stored = json.loads(dest.read_text(encoding="utf-8"))
+        self.assertEqual(stored["submitter"], "real_user")
 
     def test_ingest_issue_validation_failure_exit_code(self):
         bad = _samwise_payload()

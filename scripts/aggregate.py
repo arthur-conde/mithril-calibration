@@ -1,4 +1,4 @@
-"""Aggregate community calibration contributions for Samwise and Arwen.
+"""Aggregate community calibration contributions for Samwise, Arwen, and Smaug.
 
 Stdlib-only. Two modes:
   python aggregate.py                          # merge contributions/ -> aggregated/ + README
@@ -26,12 +26,15 @@ README_PATH = REPO_ROOT / "README.md"
 
 SAMWISE = "samwise"
 ARWEN = "arwen"
+SMAUG = "smaug"
 
-EXPECTED_SCHEMA_VERSION = {SAMWISE: 1, ARWEN: 2}
+EXPECTED_SCHEMA_VERSION = {SAMWISE: 1, ARWEN: 2, SMAUG: 1}
 
 SAMWISE_RATE_DICTS = ("rates", "phaseRates")
 SAMWISE_SLOT_DICTS = ("slotCapRates",)
 ARWEN_RATE_DICTS = ("itemRates", "signatureRates", "npcRates", "keywordRates")
+SMAUG_ABSOLUTE_DICT = "absoluteRates"
+SMAUG_RATIO_DICT = "ratioRates"
 
 CONTRIBUTORS_START = "<!-- contributors:start -->"
 CONTRIBUTORS_END = "<!-- contributors:end -->"
@@ -90,6 +93,8 @@ def _known_top_level_keys(module: str) -> set[str]:
     common = {"schemaVersion", "module", "exportedAt", "contributorNote", "submitter", "attributionOptOut", "aggregatedAt"}
     if module == SAMWISE:
         return common | set(SAMWISE_RATE_DICTS) | set(SAMWISE_SLOT_DICTS)
+    if module == SMAUG:
+        return common | {SMAUG_ABSOLUTE_DICT, SMAUG_RATIO_DICT}
     return common | set(ARWEN_RATE_DICTS)
 
 
@@ -178,6 +183,9 @@ def aggregate_module(module: str, contrib_root: Path, aggregated_root: Path, now
         agg["rates"] = _merge_dict("rates", contributions, "avgSeconds", "minSeconds", "maxSeconds")
         agg["phaseRates"] = _merge_dict("phaseRates", contributions, "avgSeconds", "minSeconds", "maxSeconds")
         agg["slotCapRates"] = _merge_slot_cap_dict("slotCapRates", contributions)
+    elif module == SMAUG:
+        agg[SMAUG_ABSOLUTE_DICT] = _merge_dict(SMAUG_ABSOLUTE_DICT, contributions, "avgPrice", "minPrice", "maxPrice")
+        agg[SMAUG_RATIO_DICT] = _merge_dict(SMAUG_RATIO_DICT, contributions, "avgRatio", "minRatio", "maxRatio")
     else:
         for dk in ARWEN_RATE_DICTS:
             agg[dk] = _merge_dict(dk, contributions, "rate", "minRate", "maxRate")
@@ -208,7 +216,7 @@ def aggregate_module(module: str, contrib_root: Path, aggregated_root: Path, now
 
 def _collect_contributors(contrib_root: Path) -> dict[str, set[str]]:
     by_login: dict[str, set[str]] = {}
-    for module in (SAMWISE, ARWEN):
+    for module in (SAMWISE, ARWEN, SMAUG):
         folder = contrib_root / module
         if not folder.exists():
             continue
@@ -266,7 +274,7 @@ def run_aggregate(
     now: datetime | None = None,
 ) -> None:
     now = now or datetime.now(timezone.utc)
-    for module in (SAMWISE, ARWEN):
+    for module in (SAMWISE, ARWEN, SMAUG):
         aggregate_module(module, contrib_root, aggregated_root, now)
     if readme_path.exists():
         rebuild_contributors_block(readme_path, contrib_root)
@@ -330,10 +338,14 @@ def _resolve_event(event: dict) -> tuple[int, str, str, str]:
         module = SAMWISE
     elif ARWEN in label_names:
         module = ARWEN
+    elif SMAUG in label_names:
+        module = SMAUG
     elif "[samwise-contribution]" in title.lower() or title.lower().startswith("[samwise"):
         module = SAMWISE
     elif "[arwen-contribution]" in title.lower() or title.lower().startswith("[arwen"):
         module = ARWEN
+    elif "[smaug-contribution]" in title.lower() or title.lower().startswith("[smaug"):
+        module = SMAUG
     if module is None:
         raise ValidationError(EXIT_UNSUPPORTED_EVENT, "could not determine module from labels or title")
     if not login:
