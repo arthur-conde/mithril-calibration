@@ -1,0 +1,45 @@
+name: Arwen calibration contribution
+description: Share your NPC favor / gift rates with the community.
+title: "[arwen-contribution] "
+labels: ["contribution", "arwen"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing! This form is wired to the app's `Share with community` button.
+
+        The button always copies a sanitized JSON payload to your clipboard (rates, sample counts, min/max — **no** raw observations, **no** character names). Arwen payloads can be large; if the field below arrives empty, paste from your clipboard.
+
+        Payload shape is documented in the [README](https://github.com/arthur-conde/gorgon-calibration#payload-shape).
+  - type: textarea
+    id: payload
+    attributes:
+      label: Calibration payload (JSON)
+      description: Paste the JSON payload from the app's Share dialog. Must be a fenced ```json block.
+      render: json
+      placeholder: |
+        {
+          "schemaVersion": 2,
+          "module": "arwen",
+          "exportedAt": "2026-04-23T12:00:00Z",
+          "itemRates":      { "NPC_Makara|StafflordsRing":            { "rate": 0.1625, "sampleCount": 1,  "minRate": 0.1625, "maxRate": 0.1625 } },
+          "signatureRates": { "NPC_Makara|Rare or Better Magic Gear": { "rate": 0.1070, "sampleCount": 29, "minRate": 0.0006, "maxRate": 0.4109 } },
+          "npcRates":       { "NPC_Makara":                           { "rate": 0.1070, "sampleCount": 29, "minRate": 0.0006, "maxRate": 0.4109 } },
+          "keywordRates":   { "MinRarity:Rare":                       { "rate": 0.1070, "sampleCount": 29, "minRate": 0.0006, "maxRate": 0.4109 } }
+        }
+    validations:
+      required: true
+  - type: textarea
+    id: contributorNote
+    attributes:
+      label: Note (optional)
+      description: Anything you want future readers of `contributions/arwen/<n>.json` to know.
+    validations:
+      required: false
+  - type: checkboxes
+    id: attributionOptOut
+    attributes:
+      label: Attribution
+      options:
+        - label: Don't list me in the README contributors block
+          required: false

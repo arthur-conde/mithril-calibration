@@ -1,0 +1,118 @@
+name: Aggregate calibration
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+  pull_request:
+    types: [closed]
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/aggregate.yml"
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: aggregate-main
+  cancel-in-progress: false
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run unit tests
+        run: python -m unittest discover tests -v
+
+  ingest-issue:
+    if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'contribution')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Ingest payload and aggregate
+        id: ingest
+        run: |
+          set +e
+          OUTPUT=$(python scripts/aggregate.py --ingest-issue "$GITHUB_EVENT_PATH" 2>&1)
+          CODE=$?
+          echo "$OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          {
+            echo "output<<EOF"
+            echo "$OUTPUT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Comment on validation failure
+        if: steps.ingest.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          REASON: ${{ steps.ingest.outputs.output }}
+        run: |
+          gh issue edit "$ISSUE_NUM" --add-label needs-fix
+          gh issue comment "$ISSUE_NUM" --body "Thanks for contributing! The aggregator couldn't ingest your submission:
+
+          > $REASON
+
+          Please edit your issue so the payload matches the [documented shape](https://github.com/${{ github.repository }}#payload-shape). The aggregator will re-run automatically when you save."
+
+      - name: Commit and push on success
+        if: steps.ingest.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add contributions/ aggregated/ README.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Ingest contribution from issue #$ISSUE_NUM"
+            git push
+          fi
+          gh issue edit "$ISSUE_NUM" --remove-label needs-fix 2>/dev/null || true
+          gh issue edit "$ISSUE_NUM" --add-label merged
+          gh issue comment "$ISSUE_NUM" --body "Merged — thanks! Your numbers are now part of the next aggregated build."
+
+  aggregate-on-pr-merge:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Re-aggregate
+        run: python scripts/aggregate.py
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add aggregated/ README.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Re-aggregate after PR #${{ github.event.pull_request.number }}"
+            git push
+          fi

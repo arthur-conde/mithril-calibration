@@ -1,0 +1,44 @@
+name: Samwise calibration contribution
+description: Share your garden growth / phase / slot-cap rates with the community.
+title: "[samwise-contribution] "
+labels: ["contribution", "samwise"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing! This form is wired to the app's `Share with community` button.
+
+        The button copies a sanitized JSON payload to your clipboard (rates, sample counts, min/max — **no** raw observations, **no** character names) and pre-fills the payload below when the URL fits. If the payload area below is empty, paste from your clipboard.
+
+        Payload shape is documented in the [README](https://github.com/arthur-conde/gorgon-calibration#payload-shape).
+  - type: textarea
+    id: payload
+    attributes:
+      label: Calibration payload (JSON)
+      description: Paste the JSON payload from the app's Share dialog. Must be a fenced ```json block.
+      render: json
+      placeholder: |
+        {
+          "schemaVersion": 1,
+          "module": "samwise",
+          "exportedAt": "2026-04-23T12:00:00Z",
+          "rates":        { "Carrot": { "avgSeconds": 3612, "sampleCount": 12, "minSeconds": 3480, "maxSeconds": 3720 } },
+          "phaseRates":   { "Carrot|Planted→Growing": { "avgSeconds": 1800, "sampleCount": 8, "minSeconds": 1740, "maxSeconds": 1860 } },
+          "slotCapRates": { "Lily": { "observedMax": 8, "sampleCount": 3 } }
+        }
+    validations:
+      required: true
+  - type: textarea
+    id: contributorNote
+    attributes:
+      label: Note (optional)
+      description: Anything you want future readers of `contributions/samwise/<n>.json` to know.
+    validations:
+      required: false
+  - type: checkboxes
+    id: attributionOptOut
+    attributes:
+      label: Attribution
+      options:
+        - label: Don't list me in the README contributors block
+          required: false
