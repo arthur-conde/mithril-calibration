@@ -1,5 +1,6 @@
 {
-  "aggregatedAt": "2026-04-26T00:38:22Z",
+  "attributionOptOut": false,
+  "exportedAt": "2026-04-25T06:35:38.2764156+00:00",
   "itemRates": {
     "NPC_Echur|PinealJuice3": {
       "maxRate": 0.08249999999999999,
@@ -1503,5 +1504,6 @@
       "rate": 0.10683287610619469,
       "sampleCount": 2
     }
-  }
+  },
+  "submitter": "arthur-conde"
 }
