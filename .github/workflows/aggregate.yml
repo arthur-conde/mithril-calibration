@@ -33,13 +33,19 @@ jobs:
         run: python -m unittest discover tests -v
 
   ingest-issue:
-    if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'contribution')
+    if: |
+      github.event_name == 'issues'
+      && contains(github.event.issue.labels.*.name, 'contribution')
+      && (github.event.action != 'labeled' || github.event.label.name == 'contribution')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refresh to latest main
+        run: git fetch origin main && git checkout origin/main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
