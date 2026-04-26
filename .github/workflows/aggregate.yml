@@ -86,7 +86,11 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Ingest contribution from issue #$ISSUE_NUM"
-            git push
+            for i in 1 2 3 4 5; do
+              git pull --rebase origin main && git push && break
+              echo "Push attempt $i failed, retrying..."
+              sleep $((i * 2))
+            done
           fi
           gh issue edit "$ISSUE_NUM" --remove-label needs-fix 2>/dev/null || true
           gh issue edit "$ISSUE_NUM" --add-label merged
@@ -114,5 +118,9 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Re-aggregate after PR #${{ github.event.pull_request.number }}"
-            git push
+            for i in 1 2 3 4 5; do
+              git pull --rebase origin main && git push && break
+              echo "Push attempt $i failed, retrying..."
+              sleep $((i * 2))
+            done
           fi
