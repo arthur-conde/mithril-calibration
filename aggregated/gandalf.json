@@ -1,0 +1,15 @@
+{
+  "aggregatedAt": "2026-05-01T00:00:00Z",
+  "module": "gandalf",
+  "schemaVersion": 1,
+  "defeats": {
+    "Mega-Spider": {
+      "durationSeconds": 10800,
+      "area": "Sun Vale"
+    },
+    "Olugax the Ever-Pudding": {
+      "durationSeconds": 10800,
+      "area": "Gazluk"
+    }
+  }
+}

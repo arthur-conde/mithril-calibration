@@ -1,6 +1,6 @@
 # gorgon-calibration
 
-Community-sourced calibration data for [Project Gorgon companion app](https://github.com/arthur-conde/project-gorgon)'s **Samwise** (garden growth rates), **Arwen** (NPC favor/gift rates), and **Smaug** (NPC vendor prices) modules. New installs of the app fetch the aggregated rates here so they get useful forecasts on day one instead of grinding from zero.
+Community-sourced calibration data for [Project Gorgon companion app](https://github.com/arthur-conde/project-gorgon)'s **Samwise** (garden growth rates), **Arwen** (NPC favor/gift rates), **Smaug** (NPC vendor prices), and **Gandalf** (defeat-cooldown durations) modules. New installs of the app fetch the aggregated rates here so they get useful forecasts on day one instead of grinding from zero.
 
 ## What's in this repo
 
@@ -9,6 +9,7 @@ Community-sourced calibration data for [Project Gorgon companion app](https://gi
 | `aggregated/samwise.json` | Current merged Samwise rates, consumed by the app |
 | `aggregated/arwen.json` | Current merged Arwen rates, consumed by the app |
 | `aggregated/smaug.json` | Current merged Smaug vendor prices, consumed by the app |
+| `aggregated/gandalf.json` | Curated defeat-cooldown durations, consumed by the app |
 | `contributions/samwise/` | Raw per-contributor Samwise submissions (one `.json` per contribution) |
 | `contributions/arwen/` | Raw per-contributor Arwen submissions |
 | `contributions/smaug/` | Raw per-contributor Smaug submissions |
@@ -16,7 +17,9 @@ Community-sourced calibration data for [Project Gorgon companion app](https://gi
 | `.github/ISSUE_TEMPLATE/` | Submission templates wired into the app's `Share` button |
 | `.github/workflows/aggregate.yml` | CI runs the aggregator on new issues and PRs |
 
-The app fetches from `https://raw.githubusercontent.com/arthur-conde/gorgon-calibration/main/aggregated/{samwise|arwen|smaug}.json`.
+The app fetches from `https://raw.githubusercontent.com/arthur-conde/mithril-calibration/main/aggregated/{samwise|arwen|smaug|gandalf}.json`.
+
+> **Note on Gandalf.** Defeat-cooldown durations aren't in `Player.log` — the rejection text doesn't carry the cooldown like static-chest rejections do, so durations come from out-of-band community knowledge (wiki, in-game observation, server folklore). `gandalf.json` is hand-curated by maintainers via PR rather than user-submitted via the Share dialog. The app auto-discovers boss *names* from kill-credit lines and falls back to a 3 h placeholder for any boss without an entry here, so adding a new boss is just appending an entry to `defeats`.
 
 ## Contributing
 
@@ -72,6 +75,24 @@ Keys are 4 segments split on `|`: `NpcKey|ItemInternalName|FavorTier|CivicPrideB
   "ratioRates":    { "NPC_Yetta|Augment|Friends|5-14":       { "avgRatio": 0.85, "sampleCount": 12, "minRatio": 0.40, "maxRatio": 1.00 } }
 }
 ```
+
+**Gandalf** (`schemaVersion: 1`):
+
+Keys are post-article-strip wisdom-line display names — what `Player.log` emits in the `"You earned <N> Combat Wisdom: Killed <Name>"` line, with any leading `a / an / the` removed (`"Killed a Mega-Spider"` → key `"Mega-Spider"`, `"Killed the Den Mother"` → key `"Den Mother"`).
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "module": "gandalf",
+  "aggregatedAt": "2026-05-01T00:00:00Z",
+  "defeats": {
+    "Mega-Spider":               { "durationSeconds": 10800, "area": "Sun Vale" },
+    "Olugax the Ever-Pudding":   { "durationSeconds": 10800, "area": "Gazluk"   }
+  }
+}
+```
+
+Adding a new boss is a one-line PR. `area` is optional but used for UI grouping.
 
 ## Aggregation math
 
